@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f5f6fb;
+  --foreground: #0f172a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-jakarta);
+  --font-label: var(--font-inter);
+
+  --color-mint-50: #effdfc;
+  --color-mint-100: #cffbf6;
+  --color-mint-200: #a1f4ec;
+  --color-mint-300: #67e6db;
+  --color-mint-400: #33cec2;
+  --color-mint-500: #00d1c1;
+  --color-mint-600: #009e93;
+  --color-mint-700: #027d76;
+  --color-mint-800: #08635f;
+  --color-mint-900: #0b524f;
+  --color-mint-950: #012f2e;
+
+  --color-tangerine-50: #fff4ed;
+  --color-tangerine-100: #ffe4d5;
+  --color-tangerine-200: #ffc4a3;
+  --color-tangerine-300: #ffb088;
+  --color-tangerine-400: #ff8c5c;
+  --color-tangerine-500: #ff6b35;
+  --color-tangerine-600: #f04e15;
+  --color-tangerine-700: #c73a0f;
+  --color-tangerine-800: #9e3212;
+  --color-tangerine-900: #7f2d14;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b1220;
+    --foreground: #e2e8f0;
+  }
+}
+
+html {
+  /* Stops the whole page from rubber-banding as one unit on iOS Safari —
+     individual scroll containers (chat, modals) still scroll normally.
+     Without this, a swipe near the top/bottom of any page drags the entire
+     viewport and immediately reads as "a website", not an app. */
+  overscroll-behavior-y: none;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  /* iOS/Android draw a gray flash on every tap by default; native apps don't. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: #a1f4ec;
+  color: #08635f;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
