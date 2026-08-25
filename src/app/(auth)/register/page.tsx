@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Sparkle } from "lucide-react";
 import { useRegister } from "@/hooks/use-auth";
-import { registerSchema, type RegisterFormValues } from "@/lib/validation/auth";
+import { registerSchema, type RegisterFormOutput, type RegisterFormValues } from "@/lib/validation/auth";
 import { ApiError } from "@/lib/http/api-client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +28,7 @@ export default function RegisterPage() {
     watch,
     setValue,
     formState: { errors },
-  } = useForm<RegisterFormValues>({ resolver: zodResolver(registerSchema) });
+  } = useForm<RegisterFormValues, unknown, RegisterFormOutput>({ resolver: zodResolver(registerSchema) });
 
   const email = watch("email") ?? "";
 

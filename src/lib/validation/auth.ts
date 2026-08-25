@@ -20,4 +20,9 @@ export const registerSchema = z.object({
   yearOfStudy: z.coerce.number().int().min(0).max(10).optional(),
 });
 
-export type RegisterFormValues = z.infer<typeof registerSchema>;
+// z.coerce.number() (for yearOfStudy, since a native number input hands
+// react-hook-form a string) makes this schema's input and output types
+// diverge: the field holds a string pre-validation and a number after.
+// zodResolver needs both — see register/page.tsx's useForm<Input, ..., Output>.
+export type RegisterFormValues = z.input<typeof registerSchema>;
+export type RegisterFormOutput = z.output<typeof registerSchema>;
