@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { MicOff, ScreenShare } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { cn, initials } from "@/lib/utils";
@@ -20,11 +20,18 @@ export function ParticipantTile({
   isVideoOn: boolean;
   isSharingScreen?: boolean;
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (videoRef.current) videoRef.current.srcObject = stream;
-  }, [stream]);
+  // A callback ref rather than an effect on [stream]: the <video> mounts and
+  // unmounts as the camera toggles, and a remount after the stream arrived
+  // would otherwise come up blank.
+  const attachVideo = useCallback(
+    (el: HTMLVideoElement | null) => {
+      if (el && el.srcObject !== stream) {
+        el.srcObject = stream;
+        el.play().catch(() => {});
+      }
+    },
+    [stream],
+  );
 
   const [first, second] = name.trim().split(/\s+/);
 
@@ -32,10 +39,14 @@ export function ParticipantTile({
     <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-2xl bg-slate-800">
       {isVideoOn && stream ? (
         <video
-          ref={videoRef}
+          ref={attachVideo}
           autoPlay
           playsInline
-          muted={isLocal}
+          // Always muted: remote audio plays through a single <RemoteAudio>
+          // element instead, so it's heard on audio calls, with the camera
+          // off, and while the call panel is minimized — and only once,
+          // even though the tiles render in both the mobile and desktop layouts.
+          muted
           className={cn("h-full w-full object-cover", isLocal && "-scale-x-100")}
         />
       ) : (
@@ -53,4 +64,17 @@ export function ParticipantTile({
       </div>
     </div>
   );
+}
+
+export function RemoteAudio({ stream }: { stream: MediaStream }) {
+  const ref = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.srcObject = stream;
+    el.play().catch((err) => console.warn("Remote audio playback blocked", err));
+  }, [stream]);
+
+  return <audio ref={ref} autoPlay className="hidden" />;
 }

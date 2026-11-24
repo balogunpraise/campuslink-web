@@ -69,6 +69,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const screenTrackRef = useRef<MediaStreamTrack | null>(null);
   const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
+  // ICE servers are fetched once per call, not once per peer/signal: the
+  // await used to sit between "no peer for this user yet" and "create one",
+  // so an offer and its trickled candidates arriving together each built
+  // their own RTCPeerConnection, and the answer/candidates landed on
+  // different connections — no media in either direction.
+  const iceServersRef = useRef<Promise<RTCIceServer[]> | null>(null);
+  // Every signaling step runs strictly in order through this chain, so a
+  // candidate can never be applied while its offer is still half-processed.
+  const signalQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     meIdRef.current = me?.id;
@@ -102,6 +111,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   function teardownActiveCall() {
     closeAllPeers();
     stopLocalMedia();
+    iceServersRef.current = null;
     activeCallRef.current = null;
     setActiveCall(null);
   }
@@ -112,6 +122,24 @@ export function CallProvider({ children }: { children: ReactNode }) {
     connection
       .invoke("SendSignal", { callId: call.id, targetUserId, kind, payload })
       .catch((err) => console.error("SendSignal failed", err));
+  }
+
+  function getIceServers(): Promise<RTCIceServer[]> {
+    iceServersRef.current ??= fetchIceServers()
+      .then(({ iceServers }) =>
+        iceServers.map((s) => ({ urls: s.urls, username: s.username, credential: s.credential })),
+      )
+      .catch((err) => {
+        iceServersRef.current = null;
+        throw err;
+      });
+    return iceServersRef.current;
+  }
+
+  function enqueueSignaling(task: () => Promise<void>) {
+    signalQueueRef.current = signalQueueRef.current
+      .then(task)
+      .catch((err) => console.error("Call signaling failed", err));
   }
 
   function createPeer(userId: string, iceServers: RTCIceServer[]): RTCPeerConnection {
@@ -130,10 +158,23 @@ export function CallProvider({ children }: { children: ReactNode }) {
     };
 
     pc.ontrack = (e) => {
-      setRemoteStreams((prev) => ({ ...prev, [userId]: e.streams[0] }));
+      const stream = e.streams[0] ?? new MediaStream([e.track]);
+      // Audio and video tracks usually share one stream object; build a new
+      // MediaStream so React sees a fresh reference and re-renders either way.
+      setRemoteStreams((prev) => {
+        const tracks = new Map<string, MediaStreamTrack>();
+        for (const t of prev[userId]?.getTracks() ?? []) tracks.set(t.id, t);
+        for (const t of stream.getTracks()) tracks.set(t.id, t);
+        return { ...prev, [userId]: new MediaStream(Array.from(tracks.values())) };
+      });
     };
 
     pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "failed") {
+        console.warn(
+          `Peer connection to ${userId} failed — usually no TURN server reachable between the two networks.`,
+        );
+      }
       if (pc.connectionState === "failed" || pc.connectionState === "closed") closePeer(userId);
     };
 
@@ -169,14 +210,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
     const newIds = Array.from(currentOtherIds).filter((id) => !peersRef.current.has(id));
     if (newIds.length === 0) return;
 
-    const { iceServers } = await fetchIceServers();
-    const rtcIceServers: RTCIceServer[] = iceServers.map((s) => ({
-      urls: s.urls,
-      username: s.username,
-      credential: s.credential,
-    }));
+    const rtcIceServers = await getIceServers();
 
     for (const otherId of newIds) {
+      if (peersRef.current.has(otherId)) continue;
       const pc = createPeer(otherId, rtcIceServers);
       if (myId < otherId) {
         const offer = await pc.createOffer();
@@ -191,11 +228,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
     let pc = peersRef.current.get(signal.fromUserId);
     if (!pc) {
-      const { iceServers } = await fetchIceServers();
-      pc = createPeer(
-        signal.fromUserId,
-        iceServers.map((s) => ({ urls: s.urls, username: s.username, credential: s.credential })),
-      );
+      const iceServers = await getIceServers();
+      pc = peersRef.current.get(signal.fromUserId) ?? createPeer(signal.fromUserId, iceServers);
     }
 
     if (signal.kind === "offer" || signal.kind === "renegotiate") {
@@ -255,7 +289,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
           incomingCallRef.current = null;
           setIncomingCall(null);
         }
-        void reconcilePeers(call);
+        enqueueSignaling(() => reconcilePeers(call));
       } else if (myParticipant && !myParticipant.declined) {
         incomingCallRef.current = call;
         setIncomingCall(call);
@@ -266,7 +300,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     };
 
     const onCallSignal = (signal: CallSignal) => {
-      void handleSignal(signal);
+      enqueueSignaling(() => handleSignal(signal));
     };
 
     connection.on("IncomingCall", onIncomingCall);

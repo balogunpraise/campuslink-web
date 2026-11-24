@@ -16,7 +16,7 @@ import {
 import { useMe } from "@/hooks/use-auth";
 import { useCall } from "@/providers/call-provider";
 import { Button } from "@/components/ui/button";
-import { ParticipantTile } from "@/components/calls/participant-tile";
+import { ParticipantTile, RemoteAudio } from "@/components/calls/participant-tile";
 import { cn } from "@/lib/utils";
 import type { CallResponse } from "@/lib/types/calls";
 
@@ -79,11 +79,19 @@ function CallControlButton({
 }
 
 export function CallOverlay() {
-  const { activeCall } = useCall();
+  const { activeCall, remoteStreams } = useCall();
   if (!activeCall) return null;
   // Keying on the call id remounts the panel (and resets its minimize state)
-  // whenever a new call starts, without needing an effect to do it.
-  return <CallPanel key={activeCall.id} call={activeCall} />;
+  // whenever a new call starts, without needing an effect to do it. Remote
+  // audio lives out here so it keeps playing while the panel is minimized.
+  return (
+    <>
+      {Object.entries(remoteStreams).map(([userId, stream]) => (
+        <RemoteAudio key={userId} stream={stream} />
+      ))}
+      <CallPanel key={activeCall.id} call={activeCall} />
+    </>
+  );
 }
 
 function CallPanel({ call }: { call: CallResponse }) {
