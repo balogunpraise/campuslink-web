@@ -11,6 +11,7 @@ import { useRegister } from "@/hooks/use-auth";
 import { registerSchema, type RegisterFormOutput, type RegisterFormValues } from "@/lib/validation/auth";
 import { ApiError } from "@/lib/http/api-client";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -104,7 +105,7 @@ export default function RegisterPage() {
 
           <div>
             <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" {...field("password")} />
+            <PasswordInput id="password" {...field("password")} />
             {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>}
           </div>
 

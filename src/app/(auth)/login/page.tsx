@@ -11,6 +11,7 @@ import { loginSchema, type LoginFormValues } from "@/lib/validation/auth";
 import { ApiError } from "@/lib/http/api-client";
 import { Sparkle } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -60,7 +61,7 @@ function LoginForm() {
           </div>
           <div>
             <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" {...register("password")} />
+            <PasswordInput id="password" {...register("password")} />
             {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>}
           </div>
           <Button type="submit" className="w-full" isLoading={login.isPending}>
